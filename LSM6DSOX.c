@@ -23,7 +23,7 @@ void spi_core_init(spi_inst_t *spi_inst, uint8_t miso, uint8_t mosi, uint8_t sck
     gpio_set_function(miso, GPIO_FUNC_SPI);
     gpio_set_function(mosi, GPIO_FUNC_SPI);
     gpio_set_function(sck, GPIO_FUNC_SPI);
-    // gpio_set_function(cs, GPIO_FUNC_SPI); // --> Possible Redundant (commented out later)
+    // gpio_set_function(cs, GPIO_FUNC_SPI); // --> Possibly Redundant (commented out later)
 
     // Register Mappings (P. 43), Timing Diagrams (P. 13), and BUS Interface (P. 19)
     // Stated that the Set Function is set to Mode 3, but in actuality, it's Mode 1 (Double-Check)
@@ -49,7 +49,7 @@ int reg_read(spi_inst_t *spi_inst, const uint8_t cs, uint8_t reg, uint8_t *buf, 
         Set bit 7 (the MSB) of the address byte to 1
         The IMU reads this bit as the R/W flag: 1 = read, 0 = write
 
-        Ref -> BUS Interface (P. 19)
+        Ref --> BUS Interface (P. 19)
     */
     reg = 0x80 | reg;
 
@@ -61,11 +61,46 @@ int reg_read(spi_inst_t *spi_inst, const uint8_t cs, uint8_t reg, uint8_t *buf, 
     return num_bytes_read;
 }
 
+void reg_write(spi_inst_t *spi_inst, const uint8_t cs, uint8_t reg, const uint8_data){
+    uint8_t msg[2];
+
+    /* 
+        Set bit 7 (the MSB) of the address byte to 0
+        The IMU reads this bit as the R/W flag: 1 = read, 0 = write
+
+        Ref --> BUS Interface (P. 19)
+    */
+    msg[0] = 0x7F & reg; 
+    msg[1] = data;
+
+    gpio_put(cs, 0);
+
+    spi_write_blocking(spi_inst, msg, 2);
+    gpio_put(cs, 1);
+}
+
+/*
+    Important Registers (P. 43): 
+        WHO_AM_I (Identifer)                    - Used to verify if reg_read works as intended
+        CTRL1_XL (Acceleratometer)              - Configure the Acceleratometer
+        CTRL2_G (Gyroscope)                     - Configure the Gyroscope
+        CTRL3_C (no clue what c Stand for)      - Configure the General Settings to do things like Burst Reads
+*/
+
+int int_init(){
+    uint8_t buf[1];
+    int num_bytes_read = 0;
+
+    num_bytes_read = reg_read(SPI_CORE, Csn, WHO_AM_I, buf, 1);
+    printf("WHO_AM_I : %x\n\r", buf[0])
+}
 int main(){
     stdio_init_all();
 
     while(1){
-
+        imu_init():
+        
+        sleep(1000);
     }
     return 0;
 }
