@@ -59,4 +59,5 @@ target_link_libraries(LSM6DSOX
         )
 
 pico_add_extra_outputs(LSM6DSOX)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 

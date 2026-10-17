@@ -14,7 +14,32 @@
 #define SCK 18
 #define MOSI 19 // TX
 #define SPI_CORE spi0
-#define SPI_CLK_FREQ 10000000
+#define SPI_CLK_FREQ 400000
+
+/*
+    Important Registers (P. 43): 
+        WHO_AM_I (Identifer)                    - Used to verify if reg_read works as intended
+        CTRL1_XL (Accelerometer)                - Configure the Accelerometer
+        CTRL2_G (Gyroscope)                     - Configure the Gyroscope
+        CTRL3_C (no clue what c Stand for)      - Configure the General Settings to do things like Burst Reads
+*/
+
+// Identification register (Should return 0x6c)
+#define WHO_AM_I    0x0F
+
+// Control Registers
+#define CTRL1_X     0x10    // Accelerometer Control (ODR, Full-Scale, Bandwidth)
+#define CTRL2_G     0x11    // Gyroscope Control (ODR, Full-Scale)
+#define CTRL3_C     0x12    // Common Control (BDU, IF_INC, Reset, etc.)
+
+// Gyroscope Output Registers (Low and High bytes for each axis)
+#define OUTX_L_G         0x22  // Gyro X-axis low byte
+
+uint8_t imu_raw_buf[12];
+int16_t gyro_raw[3];
+int16_t accel_raw[3];
+float gyro[3];
+float accel[3];
 
 void spi_core_init(spi_inst_t *spi_inst, uint8_t miso, uint8_t mosi, uint8_t sck, uint8_t cs){
     spi_init(spi_inst, SPI_CLK_FREQ);
@@ -61,7 +86,7 @@ int reg_read(spi_inst_t *spi_inst, const uint8_t cs, uint8_t reg, uint8_t *buf, 
     return num_bytes_read;
 }
 
-void reg_write(spi_inst_t *spi_inst, const uint8_t cs, uint8_t reg, const uint8_data){
+void reg_write(spi_inst_t *spi_inst, const uint8_t cs, uint8_t reg, const uint8_t data){
     uint8_t msg[2];
 
     /* 
@@ -79,28 +104,75 @@ void reg_write(spi_inst_t *spi_inst, const uint8_t cs, uint8_t reg, const uint8_
     gpio_put(cs, 1);
 }
 
-/*
-    Important Registers (P. 43): 
-        WHO_AM_I (Identifer)                    - Used to verify if reg_read works as intended
-        CTRL1_XL (Acceleratometer)              - Configure the Acceleratometer
-        CTRL2_G (Gyroscope)                     - Configure the Gyroscope
-        CTRL3_C (no clue what c Stand for)      - Configure the General Settings to do things like Burst Reads
-*/
-
-int int_init(){
+int imu_init(){
     uint8_t buf[1];
     int num_bytes_read = 0;
 
-    num_bytes_read = reg_read(SPI_CORE, Csn, WHO_AM_I, buf, 1);
-    printf("WHO_AM_I : %x\n\r", buf[0])
+    num_bytes_read = reg_read(SPI_CORE, CSn, WHO_AM_I, buf, 1);
+    printf("WHO_AM_I : %x\n\r", buf[0]);
+
+    // Accelerometer Initialization
+    reg_write(SPI_CORE, CSn, CTRL1_X, 0b10001100);
+    num_bytes_read = reg_read(SPI_CORE, CSn, CTRL1_X, buf, 1);
+    printf("CTRL1_XL : %x\n\r", buf[0]);
+
+    // Gyroscope Initialization
+    reg_write(SPI_CORE, CSn, CTRL2_G, 0b10001000);
+    num_bytes_read = reg_read(SPI_CORE, CSn, CTRL2_G, buf, 1);
+    printf("CTRL2_G : %x\n\r", buf[0]);
+    
+    // Common Control Initialization
+    reg_write(SPI_CORE, CSn, CTRL3_C, 0b00000100);
+    num_bytes_read = reg_read(SPI_CORE, CSn, CTRL3_C, buf, 1);
+    printf("CTRL3_C : %x\n\r", buf[0]);
+
+    return num_bytes_read;
 }
+
+void read_imu() {
+    int num_bytes_read = 0;
+    num_bytes_read = reg_read(SPI_CORE, CSn, OUTX_L_G, imu_raw_buf, 12);
+
+    // raw data reads
+    // for(int i = 0; i < 12; i++) {
+    //     printf("%x ", imu_raw_buf[i]);
+    //     if(i == 11) {
+    //         printf("\n\r");
+    //     }
+    // }
+
+    gyro_raw[0] = (int16_t)(imu_raw_buf[1] << 8 | imu_raw_buf[0]); //x roll
+    gyro_raw[1] = (int16_t)(imu_raw_buf[3] << 8 | imu_raw_buf[2]); // y pitch
+    gyro_raw[2] = (int16_t)(imu_raw_buf[5] << 8 | imu_raw_buf[4]); //z yaw
+
+    accel_raw[0] = (int16_t)(imu_raw_buf[7] << 8 | imu_raw_buf[6]);// x
+    accel_raw[1] = (int16_t)(imu_raw_buf[9] << 8 | imu_raw_buf[8]); // y
+    accel_raw[2] = (int16_t)(imu_raw_buf[11] << 8 | imu_raw_buf[10]); // z
+
+    // Converting from LSB Format (Raw Data) to Usable Units (Processed Data) (P. 10)
+
+    // [LSB] * [mdps/LSB] = mdps, mdps / 1000 = dps
+    gyro[0] = gyro_raw[0] * 35.0f / 1000.0f;
+    gyro[1] = gyro_raw[1] * 35.0f / 1000.0f;
+    gyro[2] = gyro_raw[2] * 35.0f / 1000.0f;
+
+    // [LSB] * [mg/LSB] = mg, mg / 1000 = g, 1g = 9.8 m/s^2
+    accel[0] = accel_raw[0] * 0.244f / 1000.0f;
+    accel[1] = accel_raw[1] * 0.244f / 1000.0f;
+    accel[2] = accel_raw[2] * 0.244f / 1000.0f;
+
+    printf("Gx: %0.3f, \tGy: %0.3f, \tGz: %0.3f, \tAx: %0.3f, \tAy: %0.3f, \tAz: %0.3f \n\r", gyro[0], gyro[1], gyro[2], accel[0], accel[1], accel[2]);
+}
+
 int main(){
     stdio_init_all();
 
+    spi_core_init(SPI_CORE, MISO, MOSI, SCK, CSn);
+    imu_init();
+
     while(1){
-        imu_init():
-        
-        sleep(1000);
+        read_imu();
+        sleep_ms(1000);
     }
     return 0;
 }

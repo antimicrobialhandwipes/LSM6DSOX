@@ -22,6 +22,10 @@
     "cmake.automaticReconfigure": false,
     "cmake.configureOnOpen": false,
     "cmake.generator": "Ninja",
+    "cmake.configureSettings": {
+    "CMAKE_MAKE_PROGRAM": "C:/Users/andre/.pico-sdk/ninja/v1.13.2/ninja.exe",
+    "CMAKE_ASM_COMPILER": "C:/Users/andre/.pico-sdk/toolchain/15_2_Rel1/bin/arm-none-eabi-gcc.exe"
+    },
     "cmake.cmakePath": "${userHome}/.pico-sdk/cmake/v4.3.4/bin/cmake",
     "C_Cpp.debugShortcut": false,
     "terminal.integrated.env.windows": {
