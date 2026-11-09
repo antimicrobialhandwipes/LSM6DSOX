@@ -1,6 +1,6 @@
 # LSM6DSOX
 
-SPI driver for the LSM6DSOX IMU on a Raspberry Pi Pico 2. It prints gyro (dps) and accel (g) readings over USB serial once per second.
+SPI driver for the LSM6DSOX IMU on a Raspberry Pi Pico 2.; Prints gyro (dps) and accel (g)
 
 #
 ![Component Preview](images/com_preview.png)
@@ -41,9 +41,6 @@ sudo minicom -D /dev/ttyACM0 -b 115200
 
 Exit with Ctrl-A, then X.
 
-**Windows (no WSL)**
-
-Open the Pico's COM port (see Device Manager) in PuTTY or Tera Term at 115200 baud.
 
 ## Expected output
 
